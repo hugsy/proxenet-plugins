@@ -55,6 +55,10 @@ class HTTPRequest :
         return self.__headers
 
     @property
+    def method(self):
+        return self.__method
+
+    @property
     def path(self):
         return self.__path
 
