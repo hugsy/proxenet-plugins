@@ -2,7 +2,7 @@
 # Stores all traffic in a SQLite db
 # 
 # Note: requests & responses are *NOT* modified (i.e. might be binary)
-# 
+#
 import sqlite3
 import time
 
@@ -13,8 +13,8 @@ class SqliteDb:
 		self.data_file = dbname
 
 		# init schema
-		self.write("CREATE TABLE requests  (id INTEGER, request BLOB, timestamp INTEGER)")
-		self.write("CREATE TABLE responses (id INTEGER, request BLOB, timestamp INTEGER)")
+		self.execute("CREATE TABLE requests  (id INTEGER, request BLOB, timestamp INTEGER)")
+		self.execute("CREATE TABLE responses (id INTEGER, request BLOB, timestamp INTEGER)")
 		return
  
 	def connect(self):
@@ -30,7 +30,7 @@ class SqliteDb:
 		cursor.close()
 		return
  
-	def write(self, query, values = ''):
+	def execute(self, query, values = ''):
 		cursor = self.connect()
 		if values != '':
 			cursor.execute(query, values)
@@ -46,22 +46,23 @@ db = SqliteDb()
 def proxenet_request_hook(request_id, request, uri):
 	global db
 	ts = int( time.time() )
-	db.write("INSERT INTO requests VALUES (?, ?, ?)", (request_id, request, ts))
+	db.execute("INSERT INTO requests VALUES (?, ?, ?)", (request_id, request, ts))
 	return request
 
     
 def proxenet_response_hook(response_id, response, uri):
 	global db
         ts = int( time.time() )
-        db.write("INSERT INTO responses VALUES (?, ?, ?)", (response_id, response, ts))
+        db.execute("INSERT INTO responses VALUES (?, ?, ?)", (response_id, response, ts))
 	return response
-	
-	
+
+
 if __name__ == "__main__":
-  uri = "foo"
-  req = "GET / HTTP/1.1\r\nHost: foo\r\nX-Header: Powered by proxenet\r\n\r\n"
-  res = "HTTP/1.0 200 OK\r\n\r\n"
-  rid = 10
-  proxenet_request_hook(rid, req, uri)
-  proxenet_response_hook(rid, res, uri)
-  
+	uri = "foo"
+	req = "GET / HTTP/1.1\r\nHost: foo\r\nX-Header: Powered by proxenet\r\n\r\n"
+	res = "HTTP/1.0 200 OK\r\n\r\n"
+	rid = 10
+	proxenet_request_hook(rid, req, uri)
+	proxenet_response_hook(rid, res, uri)
+	db.disconnect()
+	exit(0)
