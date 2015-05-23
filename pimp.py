@@ -43,7 +43,7 @@ class HTTPRequest :
         return
 
     def del_header(self, key):
-        self.headers.pop(key)
+        self.headers.pop(key, None)
         return
 
     def update_content_length(self):
