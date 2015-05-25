@@ -1,13 +1,24 @@
-################################################################################
-#
-# Lightweight interception plugin for proxenet
-#
-# Requires:
-# - PyQt4
-#
-# @_hugsy_
-#
-################################################################################
+"""
+Lightweight interception plugin for proxenet by @_hugsy_.
+On top of simply intercepting the traffic, it can be
+used to save request as raw text or as Python script
+ready to replay.
+Also it can be used to prepare `patator` command, for
+file/argument fuzzing.
+
+It will automatically recognize specific body formats:
+* JSON
+* XML
+
+And also parse ASP.NET viewstate.
+
+To add/remove file extensions to white/black list for
+interception, edit the file from the CONFIG_FILE
+variable.
+
+Requires:
+ - PyQt4
+"""
 
 import sys, os, urlparse, json, xml.etree.ElementTree
 import socket, base64, pprint, urllib, ConfigParser
@@ -16,7 +27,7 @@ from PyQt4 import QtCore, QtGui
 from PyQt4.QtGui import *
 
 PLUGIN_NAME = "Interceptor"
-AUTHOR      = "@_hugsy_"
+AUTHOR      = "hugsy"
 
 CRLF = "\r\n"
 CONFIG_FILE = os.getenv("HOME") + "/.interceptor.ini"
