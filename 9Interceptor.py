@@ -534,6 +534,11 @@ def intercept(rid, text, uri):
     global config
 
     if config is None:
+        if not os.access(CONFIG_FILE, os.R_OK):
+            print("Creating config file at '%s'" % CONFIG_FILE)
+            with open(CONFIG_FILE, "w") as f:
+                f.write("[main]\nstyle = Cleanlooks\nblacklisted_extensions = .css .js .jpg .png\n")
+
         config = ConfigParser.ConfigParser()
         config.read(CONFIG_FILE)
 
