@@ -30,7 +30,7 @@ PLUGIN_NAME = "Interceptor"
 AUTHOR      = "hugsy"
 
 CRLF = "\r\n"
-CONFIG_FILE = os.getenv("HOME") + "/.interceptor.ini"
+CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
 config = None
 
 
@@ -44,7 +44,7 @@ class OptionsView(QWidget):
     def setTabLayout(self):
         lay = QVBoxLayout()
         l1 = QLabel()
-        blacklist = config.get("main", "__blacklisted")
+        blacklist = config.get(PLUGIN_NAME, "__blacklisted")
         l1.setText("%d Blacklisted Extensions" % (len(blacklist)))
         te = QTextEdit()
         te.setFrameStyle(QFrame.Panel | QFrame.Plain)
@@ -405,12 +405,12 @@ class Interceptor(QMainWindow):
         self.title = "Interceptor for proxenet: Request %d" % (rid,)
         self.data = data
 
-        if config.has_option("main", "blacklisted_extensions"):
-            blacklist = config.get("main", "blacklisted_extensions").split(" ")
+        if config.has_option(PLUGIN_NAME, "blacklisted_extensions"):
+            blacklist = config.get(PLUGIN_NAME, "blacklisted_extensions").split(" ")
         else:
             blacklist = []
 
-        config.set("main", "__blacklisted", blacklist)
+        config.set(PLUGIN_NAME, "__blacklisted", blacklist)
 
         u = urlparse.urlparse(uri)
         if any( map(lambda x: u.path.endswith(x), blacklist) ):
@@ -431,8 +431,8 @@ class Interceptor(QMainWindow):
         self.setGeometry(150, 150, 960, 600)
         self.setWindowTitle(self.title)
 
-        if config.has_option("main", "style"):
-            qtlook = config.get("main", "style")
+        if config.has_option(PLUGIN_NAME, "style"):
+            qtlook = config.get(PLUGIN_NAME, "style")
         else:
             qtlook = "Cleanlooks"
         qApp.setStyle( qtlook )
@@ -537,7 +537,7 @@ def intercept(rid, text, uri):
         if not os.access(CONFIG_FILE, os.R_OK):
             print("Creating config file at '%s'" % CONFIG_FILE)
             with open(CONFIG_FILE, "w") as f:
-                f.write("[main]\nstyle = Cleanlooks\nblacklisted_extensions = .css .js .jpg .png\n")
+                f.write("[%s]\nstyle = Cleanlooks\nblacklisted_extensions = .css .js .jpg .png\n" % PLUGIN_NAME)
 
         config = ConfigParser.ConfigParser()
         config.read(CONFIG_FILE)
