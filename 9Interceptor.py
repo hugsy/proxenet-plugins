@@ -429,6 +429,7 @@ class Interceptor(QMainWindow):
 
     def setMainWindowProperty(self):
         self.setGeometry(150, 150, 960, 600)
+        self.setFixedSize(960, 600)
         self.setWindowTitle(self.title)
 
         if config.has_option(PLUGIN_NAME, "style"):
@@ -526,8 +527,14 @@ s.close()
            port,
            "s = ssl.wrap_socket(s)" if o.scheme=='https' else '',
            data,
-           __PLUGIN_NAME__))
+           PLUGIN_NAME))
         return
+
+
+def create_config_file():
+    with open(CONFIG_FILE, "w") as f:
+        f.write("[%s]\nstyle = Cleanlooks\nblacklisted_extensions = .css .js .jpg .png\n" % PLUGIN_NAME)
+    return
 
 
 def intercept(rid, text, uri):
@@ -536,8 +543,7 @@ def intercept(rid, text, uri):
     if config is None:
         if not os.access(CONFIG_FILE, os.R_OK):
             print("Creating config file at '%s'" % CONFIG_FILE)
-            with open(CONFIG_FILE, "w") as f:
-                f.write("[%s]\nstyle = Cleanlooks\nblacklisted_extensions = .css .js .jpg .png\n" % PLUGIN_NAME)
+            create_config_file()
 
         config = ConfigParser.ConfigParser()
         config.read(CONFIG_FILE)
@@ -566,6 +572,7 @@ def intercept(rid, text, uri):
 
 
 def proxenet_request_hook(request_id, request, uri):
+    print ("Interceptor %d - %s" % (request_id, uri))
     data = intercept(request_id, request.replace(CRLF, "\n"), uri)
     data = data.replace("\n", CRLF)
     return data
@@ -577,8 +584,6 @@ def proxenet_response_hook(response_id, response, uri):
 
 if __name__ == "__main__":
     vs = '%2fwEPDwUKMTQ2OTkzNDMyMWRkOWxNFeQcY9jzeKVCluHBdzA6WBo%3d'
-    # vs = '%2fwEPDwUJODczNjQ5OTk0D2QWAgIDD2QWAgIFDw8WAh4EVGV4dAUWSSBMb3ZlIERvdG5ldEN1cnJ5LmNvbWRkZMHbBY9JqBTvB5%2f6kXnY15AUSAwa'
-    # vs = '%2fwEPDwUKMTQ2OTkzNDMyMQ9kFgICAw9kFgICAw8PFgQeBFRleHQFCENsaWNrIG1lHgtDb21tYW5kTmFtZQUDWFhYZGRk7q5i15YA6gDUPW8m%2fIVLqGXnb%2b4%3d'
     uri = "https://foo.bar/bar.asp"
     body = "&".join(["a=b", "b=c", "t=x", "__VIEWSTATE=%s"%vs])
     req = """POST /bar.asp HTTP/1.1\r

