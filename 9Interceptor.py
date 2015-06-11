@@ -20,11 +20,17 @@ Requires:
  - PyQt4
 """
 
-import sys, os, urlparse, json, xml.etree.ElementTree
+import sys, os, urlparse, json
 import socket, base64, pprint, urllib, ConfigParser
 
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtGui import *
+try:
+    from lxml import etree
+    from PyQt4 import QtCore, QtGui
+    from PyQt4.QtGui import *
+except ImportError as ie:
+    print("Missing package: %s" % ie)
+    exit(1)
+
 
 PLUGIN_NAME = "Interceptor"
 AUTHOR      = "hugsy"
@@ -220,12 +226,16 @@ class XmlInterceptView(QWidget):
 
         try:
             body = str( self.xmlf.toPlainText() )
-            x = xml.etree.ElementTree.fromstring(body)
+            parser = etree.XMLParser(dtd_validation=False)
+            root = etree.fromstring( body, parser )
             p.setColor( QPalette.Foreground, QtCore.Qt.darkYellow )
             self.xmll.setText("Content is <b>valid</b> XML")
-        except xml.etree.ElementTree.ParseError:
+        except etree.XMLSyntaxError:
             p.setColor( QPalette.Foreground, QtCore.Qt.darkRed )
             self.xmll.setText("Content is <b>not valid</b> XML")
+        except Exception as e:
+            p.setColor( QPalette.Foreground, QtCore.Qt.darkRed )
+            self.xmll.setText("Could not check XML validity: %s" % e)
 
         self.xmll.setPalette(p)
         self.parent.parent.body = body
