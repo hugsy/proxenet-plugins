@@ -20,7 +20,7 @@ Requires:
  - PyQt4
 """
 
-import sys, os, urlparse, json
+import sys, os, urlparse, json, subprocess, inspect, copy
 import socket, base64, pprint, urllib, ConfigParser
 
 try:
@@ -38,6 +38,13 @@ AUTHOR      = "hugsy"
 CRLF = "\r\n"
 CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
 config = None
+
+
+def error(msg): return "\x1b[1m" + "\x1b[31m" + msg + "\x1b[0m"
+
+
+class DoNotInterceptException(Exception):
+    pass
 
 
 class OptionsView(QWidget):
@@ -424,7 +431,7 @@ class Interceptor(QMainWindow):
 
         u = urlparse.urlparse(uri)
         if any( map(lambda x: u.path.endswith(x), blacklist) ):
-            return
+            raise DoNotInterceptException()
 
         if not self.data.endswith("\n\n"):
             self.headers, self.body = self.data.split("\n\n")
@@ -547,44 +554,46 @@ def create_config_file():
     return
 
 
-def intercept(rid, text, uri):
+def init_config():
     global config
 
     if config is None:
         if not os.access(CONFIG_FILE, os.R_OK):
-            print("Creating config file at '%s'" % CONFIG_FILE)
+            error("Creating config file at '%s'" % CONFIG_FILE)
             create_config_file()
 
         config = ConfigParser.ConfigParser()
         config.read(CONFIG_FILE)
+    return
 
-    # this hack is because Qt must run from the main thread
-    sparent, schild = socket.socketpair()
-    pid = os.fork()
-    if pid == 0:
-        schild.close()
-        app = QApplication([""])
+
+def intercept(rid, text, uri):
+    try:
+        init_config()
+        text = text.replace(CRLF, "\n")
+        app = QApplication([uri,])
         win = Interceptor(rid, uri, text)
+        win.show()
         app.exec_()
-        ret = str(win.data)
-        sparent.sendall(ret)
-        exit(0)
-
-    sparent.close()
-    buf = ""
-    while True:
-        c = schild.recv(1)
-        if len(c)==0: break
-        buf += c
-
-    (pid, rcode) = os.waitpid(pid, 0)
-    return buf
+        ret = str(win.data).replace("\n", CRLF)
+        return ret
+    except DoNotInterceptException as e:
+        # error("Request %d refers to a blacklisted extensions - will not intercept" % (rid,))
+        return text
+    except Except as e:
+        error("An unexpected exception occured on request %d: %s" % (rid,e))
+        return text
 
 
 def proxenet_request_hook(request_id, request, uri):
-    print ("Interceptor %d - %s" % (request_id, uri))
-    data = intercept(request_id, request.replace(CRLF, "\n"), uri)
-    data = data.replace("\n", CRLF)
+    # print ("Interceptor %d - %s" % (request_id, uri))
+    cmd = ["python2", inspect.getfile(inspect.currentframe()), str(request_id), uri]
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+    if p is None:
+        return request
+
+    data = p.communicate(input = request)[0]
+    p.wait()
     return data
 
 
@@ -593,6 +602,18 @@ def proxenet_response_hook(response_id, response, uri):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 3:
+        rid = int(sys.argv[1])
+        req = sys.stdin.read()
+        url = sys.argv[2]
+        for i in range(3,128):
+            try:     os.close(i)
+            except:  continue
+        print (intercept(rid, req, url))
+        exit(0)
+
+    # test goes here
+    rid = 1337
     vs = '%2fwEPDwUKMTQ2OTkzNDMyMWRkOWxNFeQcY9jzeKVCluHBdzA6WBo%3d'
     uri = "https://foo.bar/bar.asp"
     body = "&".join(["a=b", "b=c", "t=x", "__VIEWSTATE=%s"%vs])
@@ -602,8 +623,10 @@ X-Header: Powered by proxenet\r
 Content-Length: %d\r
 \r
 %s""" % (len(body), body)
-    rid = 1337
+
+    os.write(2, '%d\n' % len(sys.argv))
     print ("="*50)
-    print ("BEFORE:\n%s" % req)
-    print ('\n' + "="*50 + '\n')
-    print ("AFTER:\n%s" % proxenet_request_hook(rid, req, uri))
+    print ("BEFORE:\n%s\n" % req)
+
+    print ("="*50)
+    print ("AFTER:\n%s\n" % intercept(rid, req, uri))
