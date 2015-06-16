@@ -574,15 +574,14 @@ PORT = {:d}
 socktcp = TCPSocket.new(HOST, PORT)
 '''.format(self.uri, "require 'openssl'" if o.scheme=='https' else '', netloc, port)
         if o.scheme=='https':
-            content += '''ctx = OpenSSL::SSL::SSLContext.new()
-ctx.set_params(verify_mode: OpenSSL::SSL::VERIFY_NONE)
-ssl_client = OpenSSL::SSL::SSLSocket.new(socktcp, ctx)
+            content += '''ssl_client = OpenSSL::SSL::SSLSocket.new(socktcp)
 ssl_client.connect()
 sock = ssl_client'''
         else:
             content += '''sock = socktcp'''
 
-        content += '''req = "{:s}"
+        content += '''
+req = "{:s}"
 sock.puts(req)
 puts sock.read()
 
