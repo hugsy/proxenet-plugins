@@ -629,6 +629,21 @@ close($sock);
         self.writeGenericFile("Create Ruby script from Request", content)
         return
 
+def is_blacklisted_extension(uri):
+    global config
+
+    if config.has_option(PLUGIN_NAME, "blacklisted_extensions"):
+            blacklist = config.get(PLUGIN_NAME, "blacklisted_extensions").split(" ")
+    else:
+            blacklist = []
+
+    o = urlparse.urlparse( uri )
+    for ext in blacklist:
+        if o.path.endswith(ext):
+            return True
+    return False
+
+
 def create_config_file():
     with open(CONFIG_FILE, "w") as f:
         f.write("[%s]\nstyle = Cleanlooks\nblacklisted_extensions = .css .js .jpg .png\n" % PLUGIN_NAME)
@@ -649,8 +664,11 @@ def init_config():
 
 
 def intercept(rid, text, uri):
+    init_config()
+    if is_blacklisted_extension(uri):
+        return text
+
     try:
-        init_config()
         text = text.replace(CRLF, "\n")
         app = QApplication([uri,])
         win = Interceptor(rid, uri, text)
@@ -658,10 +676,6 @@ def intercept(rid, text, uri):
         app.exec_()
         ret = str(win.data).replace("\n", CRLF)
         return ret
-
-    except DoNotInterceptException as e:
-        # error("Request %d refers to a blacklisted extensions - will not intercept" % (rid,))
-        return text
 
     except Exception as e:
         error("An unexpected exception occured on request %d: %s" % (rid,e))
@@ -688,9 +702,6 @@ if __name__ == "__main__":
         rid = int(sys.argv[1])
         req = sys.stdin.read()
         url = sys.argv[2]
-        for i in range(3,128):
-            try:     os.close(i)
-            except:  continue
         print (intercept(rid, req, url))
         exit(0)
 
