@@ -15,7 +15,7 @@ ALREADY_VISITED_PATH = []
 
 
 def success(msg):
-    print("\x1b[4m\x1b[1m\x1b[95m{}\x1b[0m".format(msg))
+    print("\x1b[4m\x1b[1m\x1b[95m" + msg + "\x1b[0m")
     return
 
 
@@ -37,10 +37,10 @@ def get_paths(uri):
 
 
 def scan_dirlist(path):
-    PATTERNS = ["Parent Directory", "Last modified",
-                "Index Of", "Description", "Name", "Size"]
+    PATTERNS = ["Parent Directory", "Last modified", "Index Of",
+                "Description", "Name", "Size", "Apache/", "../"]
     match = 0
-    success_ratio = 0.7
+    success_ratio = 0.70
 
     try:
         f = urllib.urlopen(path)
@@ -51,30 +51,26 @@ def scan_dirlist(path):
                 match += 1
 
         ratio = float(match)/len(PATTERNS)
-        if ratio == 0:
-            return
+        print "ratio(%s)=%f" % (path,ratio)
 
-        if 0 < ratio < success_ratio:
-            succes( "[+] Directory listing on '%s' (LIKELY)" % path )
-        else:
-            succes( "[+] Directory listing on '%s'" % path )
+        if (success_ratio/2) < ratio < success_ratio:
+            success( "[+] Directory listing on '%s' (LIKELY)" % path )
+        elif ratio >= success_ratio:
+            success( "[+] Directory listing on '%s'" % path )
 
-    except:
+    except Exception as e:
         pass
 
     return
-
-
-def was_visited(url):
-    return url in ALREADY_VISITED_PATH
 
 
 def proxenet_request_hook(request_id, request, uri):
     global ALREADY_VISITED_PATH
 
     for url in get_paths(uri):
-        if was_visited(url): continue
-        print "trying ", url
+        if url in ALREADY_VISITED_PATH:
+            continue
+
         scan_dirlist(url)
         ALREADY_VISITED_PATH.append( url )
 
@@ -87,7 +83,7 @@ def proxenet_response_hook(response_id, response, uri):
 
 if __name__ == "__main__":
     rid = 1337
-    target = "192.168.56.101:80"
+    target = "192.168.56.102:80"
     path = "/blah/blih//plop//////balhhe?foobar"
     uri = "http://{:s}{:s}".format(target, path)
     req = "GET {:s} HTTP/1.1\r\n".format(path)
