@@ -51,7 +51,6 @@ def scan_dirlist(path):
                 match += 1
 
         ratio = float(match)/len(PATTERNS)
-        print "ratio(%s)=%f" % (path,ratio)
 
         if (success_ratio/2) < ratio < success_ratio:
             success( "[+] Directory listing on '%s' (LIKELY)" % path )
