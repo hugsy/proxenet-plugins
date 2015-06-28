@@ -40,7 +40,10 @@ CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
 config = None
 
 
-def error(msg): print( "\x1b[1m" + "\x1b[31m" + msg + "\x1b[0m" )
+def error(msg):
+    sys.stderr.write("\x1b[1m" + "\x1b[31m" + msg + "\x1b[0m\n")
+    sys.stderr.flush()
+    return
 
 
 class DoNotInterceptException(Exception):
@@ -629,6 +632,99 @@ close($sock);
         self.writeGenericFile("Create Ruby script from Request", content)
         return
 
+class ReceptorMainWindow(QWidget):
+    def __init__(self, parent):
+        super(ReceptorMainWindow, self).__init__()
+        self.parent = parent
+        self.setMainWindowLayout()
+        return
+
+    def bounceResponse(self):
+        self.parent.body = str( self.parent.body )
+        QApplication.quit()
+        return
+
+    def updateResponseBody(self):
+        self.parent.body = self.bodyEditField.toPlainText()
+        return
+
+    def setMainWindowLayout(self):
+        bodyLayout = QVBoxLayout()
+        lurl1 = QLabel("<b>URL</b>")
+        lurl2 = QLabel("<p style=color:%s>%s</p>" % ("darkgreen" if self.parent.uri.startswith("https") \
+                                                     else "darkred",
+                                                     self.parent.uri))
+        lb = QLabel("<b>Body</b>")
+        self.bodyEditField = QTextEdit()
+        self.bodyEditField.insertPlainText( self.parent.body )
+        self.bodyEditField.setFrameStyle(QFrame.Panel | QFrame.Plain)
+        self.bodyEditField.textChanged.connect( self.updateResponseBody )
+        bodyLayout.addWidget(lurl1)
+        bodyLayout.addWidget(lurl2)
+        bodyLayout.addWidget(lb)
+        bodyLayout.addWidget(self.bodyEditField)
+
+        btnLayout = QHBoxLayout()
+        btnLayout.addStretch(1)
+        bounceButton = QPushButton("Bounce")
+        bounceButton.clicked.connect( self.bounceResponse )
+        cancelButton = QPushButton("Cancel")
+        cancelButton.clicked.connect(QApplication.quit)
+        btnLayout.addWidget(cancelButton)
+        btnLayout.addWidget(bounceButton)
+
+        vbox = QVBoxLayout()
+        vbox.addLayout(bodyLayout)
+        vbox.addLayout(btnLayout)
+        self.setLayout(vbox)
+        return
+
+
+class Receptor(QMainWindow):
+    def __init__(self, rid, uri, data):
+        super(Receptor, self).__init__()
+        self.title = "Receptor for proxenet: Request-id %d" % (rid,)
+        self.rid = rid
+        self.uri = uri
+        self.body = data
+
+        self.setMainWindowProperty()
+        self.setMainWindowMenuBar()
+        self.setCentralWidget( ReceptorMainWindow( self ) )
+        self.show()
+        return
+
+    def setMainWindowProperty(self):
+        self.setGeometry(150, 150, 960, 600)
+        self.setFixedSize(960, 600)
+        self.setWindowTitle(self.title)
+
+        if config.has_option(PLUGIN_NAME, "style"):
+            qtlook = config.get(PLUGIN_NAME, "style")
+        else:
+            qtlook = "Cleanlooks"
+        qApp.setStyle( qtlook )
+        return
+
+    def setMainWindowMenuBar(self):
+        saveTxtFile = QAction(QIcon(), 'Save As Text file', self)
+        saveTxtFile.setShortcut('Ctrl+T')
+        saveTxtFile.triggered.connect(self.writeTxtFile)
+
+        menubar = self.menuBar()
+        fileMenu = menubar.addMenu('&Actions')
+        fileMenu.addAction(saveTxtFile)
+        return
+
+    def writeTxtFile(self):
+        filename = QFileDialog().getSaveFileName(self, "Save Request as Text", os.getenv("HOME"))
+        if len(filename) == 0:
+            return
+        with open(filename, "w") as f:
+            f.write(self.body)
+        return
+
+
 def is_blacklisted_extension(uri):
     global config
 
@@ -646,7 +742,9 @@ def is_blacklisted_extension(uri):
 
 def create_config_file():
     with open(CONFIG_FILE, "w") as f:
-        f.write("[%s]\nstyle = Cleanlooks\nblacklisted_extensions = .css .js .jpg .png\n" % PLUGIN_NAME)
+        f.write("[%s]\n" % PLUGIN_NAME)
+        f.write("style = Cleanlooks\n")
+        f.write("blacklisted_extensions = .css .js .jpg .png\n")
     return
 
 
@@ -682,28 +780,53 @@ def intercept(rid, text, uri):
         return text
 
 
-def proxenet_request_hook(request_id, request, uri):
-    cmd = ["python2", inspect.getfile(inspect.currentframe()), str(request_id), uri]
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
-    if p is None:
-        return request
+def recept(rid, text, uri):
+    init_config()
+    if is_blacklisted_extension(uri):
+        return text
 
-    data = p.communicate(input = request)[0]
+    try:
+        text = text.replace(CRLF, "\n")
+        app = QApplication([uri,])
+        win = Receptor(rid, uri, text)
+        win.show()
+        app.exec_()
+        ret = str(win.body).replace("\n", CRLF)
+        return ret
+
+    except Exception as e:
+        error("An unexpected exception occured on request %d: %s" % (rid, e))
+        return text
+
+
+def call_gui(_type, rid, buffer, uri):
+    cmd = ["python2", inspect.getfile(inspect.currentframe()), _type, str(request_id), uri]
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+    if p is None: return request
+    data = p.communicate(input = buffer)[0]
     p.wait()
     return data
 
 
+def proxenet_request_hook(request_id, request, uri):
+    return call_gui("req", request_id, request, uri)
+
+
 def proxenet_response_hook(response_id, response, uri):
-    return response
+    return call_gui("res", response_id, response, uri)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 3:
-        rid = int(sys.argv[1])
-        req = sys.stdin.read()
-        url = sys.argv[2]
-        print (intercept(rid, req, url))
-        exit(0)
+    if len(sys.argv) == 4:
+        if sys.argv[1] in ("req", "res"):
+            rid = int(sys.argv[2])
+            buf = sys.stdin.read()
+            url = sys.argv[3]
+            if sys.argv[1] == "req":
+                print (intercept(rid, buf, url))
+            elif sys.argv[1] == "res":
+                print (recept(rid, buf, url))
+            exit(0)
 
     # test goes here
     rid = 1337
@@ -722,4 +845,7 @@ Content-Length: %d\r
     print ("BEFORE:\n%s\n" % req)
 
     print ("="*50)
-    print ("AFTER:\n%s\n" % intercept(rid, req, uri))
+    print ("AFTER intercept:\n%s\n" % intercept(rid, req, uri))
+
+    print ("="*50)
+    print ("AFTER recept:\n%s\n" % recept(rid, req, uri))
