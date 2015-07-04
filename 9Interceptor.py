@@ -695,7 +695,7 @@ class Receptor(QMainWindow):
         return
 
     def setMainWindowProperty(self):
-        self.setGeometry(150, 150, 960, 600)
+        self.setGeometry(50, 50, 960, 600)
         self.setFixedSize(960, 600)
         self.setWindowTitle(self.title)
 
@@ -800,7 +800,7 @@ def recept(rid, text, uri):
 
 
 def call_gui(_type, rid, buffer, uri):
-    cmd = ["python2", inspect.getfile(inspect.currentframe()), _type, str(request_id), uri]
+    cmd = ["python2", inspect.getfile(inspect.currentframe()), _type, str(rid), uri]
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
     if p is None: return request
     data = p.communicate(input = buffer)[0]
