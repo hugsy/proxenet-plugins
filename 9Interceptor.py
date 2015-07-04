@@ -448,7 +448,7 @@ class Interceptor(QMainWindow):
         return
 
     def setMainWindowProperty(self):
-        self.setGeometry(150, 150, 960, 600)
+        self.setGeometry(50, 50, 960, 600)
         self.setFixedSize(960, 600)
         self.setWindowTitle(self.title)
 
