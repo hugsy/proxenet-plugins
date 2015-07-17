@@ -36,7 +36,7 @@ class HTTPRequest :
 
 
     def has_header(self, key):
-        return key.lower() in [ x.lower() in self.headers.keys()]
+        return key.lower() in [ x.lower() for x in self.headers.keys()]
 
     def add_header(self, key, value=""):
         self.headers.setdefault(key, value)
@@ -96,10 +96,16 @@ class HTTPResponse :
         return
 
     def has_header(self, key):
-        return key.lower() in [ x.lower() in self.headers.keys()]
+        return key.lower() in [ x.lower() for x in self.headers.keys()]
+
+    def get_header(self, key):
+        for x in self.headers.keys():
+            if x.lower() == key.lower():
+                return self.headers[x]
+        return None
 
     def add_header(self, key, value=""):
-        self.headers.setdefault(key, value)
+        self.headers[key] = value
         return
 
     def del_header(self, key):
@@ -111,12 +117,10 @@ class HTTPResponse :
             self.add_header("Content-Length", len(self.body))
         return
 
-
-    def __str__(self):
+    def render(self):
         res = ""
         self.update_content_length()
-
-        head = "{0} {1} {2}".format(self.version, self.status, self.reason)
+        head = "{0} {1} {2}".format(self.protocol, self.status, self.reason)
         hrds = ["{0}: {1}".format(k,v) for k,v in self.headers.iteritems()]
         data = self.body
 
