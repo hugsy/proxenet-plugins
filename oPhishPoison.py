@@ -38,6 +38,8 @@ types = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml
          "ppt": "application/vnd.ms-powerpoint",
          "pdf": "application/pdf",
          "swf": "application/x-shockwave-flash",
+         "exe": "application/x-msdos-program",
+
          }
 
 
