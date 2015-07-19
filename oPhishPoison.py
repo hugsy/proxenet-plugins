@@ -12,8 +12,6 @@ How to use:
   ex: # ./Responder.py -v -w -I vboxnet0 -u 192.168.56.1:8008
 - Enjoy the free shells
 
-TODO:
-- add html poisoning: inject b33f javascript
 """
 
 PLUGIN_NAME   = "oPhishPoison"
