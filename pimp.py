@@ -30,21 +30,18 @@ class HTTPObject:
         return
 
     def has_header(self, key):
-        return key.lower() in [ x.lower() for x in self.headers.keys()]
+        return key.lower() in self.headers.keys()
 
     def get_header(self, key):
-        for x in self.headers.keys():
-            if x.lower() == key.lower():
-                return self.headers[x]
-        return None
+        return self.headers.get(key.lower(), None)
 
     def add_header(self, key, value=""):
-        self.headers[key] = value
+        self.headers[ key.lower() ] = value
         return
 
     def del_header(self, key):
         for k in self.headers.keys():
-            if k.lower() == key.lower():
+            if k == key.lower():
                 self.headers.pop(k, None)
         return
 
