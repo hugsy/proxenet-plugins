@@ -43,7 +43,9 @@ class HTTPObject:
         return
 
     def del_header(self, key):
-        self.headers.pop(key, None)
+        for k in self.headers.keys():
+            if k.lower() == key.lower():
+                self.headers.pop(k, None)
         return
 
     def update_content_length(self):

