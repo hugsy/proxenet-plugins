@@ -23,7 +23,8 @@ class HTTPObject:
     """
     Generic class for manipulating HTTP objects from proxenet
     """
-    def __init__(self,r):
+    def __init__(self, **kwargs):
+        self.rid        = kwargs.get("rid", 0)
         self.headers	= {}
         self.body	= ""
         return
@@ -58,7 +59,8 @@ class HTTPRequest(HTTPObject) :
     passed to proxenet.
     """
 
-    def __init__(self, r):
+    def __init__(self, r, **kwargs):
+        HTTPObject.__init__(self, **kwargs)
         self.method 	= "GET"
         self.path 	= "/"
         self.version    = "HTTP/1.1"
@@ -87,7 +89,10 @@ class HTTPRequest(HTTPObject) :
         return
 
     def __str__(self):
-        return "Request [{method} {path} {version}]".format(method=self.method, path=self.path, version=self.version)
+        return "Request {rid} [{method} {path} {version}]".format(rid=self.rid,
+                                                                  method=self.method,
+                                                                  path=self.path,
+                                                                  version=self.version)
 
     def render(self):
         """
@@ -131,7 +136,8 @@ class HTTPRequest(HTTPObject) :
 
 class HTTPResponse(HTTPObject):
 
-    def __init__(self, r):
+    def __init__(self, r, **kwargs):
+        HTTPObject.__init__(self, **kwargs)
         self.protocol   = "HTTP/1.1"
         self.status     = 200
         self.reason     = "Ok"
@@ -157,9 +163,10 @@ class HTTPResponse(HTTPObject):
         return
 
     def __str__(self):
-        return "Response [{protocol} {status} {reason}]".format(protocol=self.protocol,
-                                                                status=self.status,
-                                                                reason=self.reason)
+        return "Response {rid} [{protocol} {status} {reason}]".format(rid=self.rid,
+                                                                      protocol=self.protocol,
+                                                                      status=self.status,
+                                                                      reason=self.reason)
 
     def render(self):
         self.update_content_length()
