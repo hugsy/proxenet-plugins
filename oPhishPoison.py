@@ -24,12 +24,16 @@ from pimp import HTTPRequest, HTTPResponse, HTTPBadResponseException
 HOME = os.getenv( "HOME" )
 CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
 
-config = ConfigParser.ConfigParser()
-config.read(CONFIG_FILE)
-path_to_msfpayload   = config.get(PLUGIN_NAME, "msfpayload", 0, {"home": os.getenv("HOME")})
-path_to_python       = config.get(PLUGIN_NAME, "python", 0, {"home": os.getenv("HOME")})
-path_to_xor_payload  = config.get(PLUGIN_NAME, "xor_payload", 0, {"home": os.getenv("HOME")})
-path_to_html         = config.get(PLUGIN_NAME, "html_inject_stub", 0, {"home": os.getenv("HOME")})
+try:
+    config = ConfigParser.ConfigParser()
+    config.read(CONFIG_FILE)
+    path_to_msfpayload   = config.get(PLUGIN_NAME, "msfpayload", 0, {"home": os.getenv("HOME")})
+    path_to_python       = config.get(PLUGIN_NAME, "python", 0, {"home": os.getenv("HOME")})
+    path_to_xor_payload  = config.get(PLUGIN_NAME, "xor_payload", 0, {"home": os.getenv("HOME")})
+    path_to_html         = config.get(PLUGIN_NAME, "html_inject_stub", 0, {"home": os.getenv("HOME")})
+except Exception as e:
+    print("[-] Plugin '%s' cannot be loaded: %s" % (PLUGIN_NAME, e))
+    exit(1)
 
 file_cache = { "html": path_to_html, }
 q = {}
