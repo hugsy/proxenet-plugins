@@ -126,11 +126,11 @@ class HTTPRequest(HTTPObject) :
         if i==-1 and j==-1:
             return self.path
         elif j==-1:
-            return self.path[i:]
+            return self.path[i+1:]
         elif i==-1:
-            return self.path[:j]
+            return self.path[:j+1]
         else:
-            return self.path[i:j]
+            return self.path[i+1:j+1]
 
 
 class HTTPResponse(HTTPObject):
