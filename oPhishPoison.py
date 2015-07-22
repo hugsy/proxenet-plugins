@@ -76,7 +76,7 @@ def replace_with_malicious(http, ctype):
     2. replace the HTTP response body
     3. profit
     """
-    global b
+    global q
 
     # 1.
     res = hit_cache(ctype)
