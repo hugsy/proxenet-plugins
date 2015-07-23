@@ -120,8 +120,8 @@ class HTTPRequest(HTTPObject) :
         """
         Returns the name of the script/file/method of the path attribute.
         """
-        i = self.path.rfind("/", 1)
-        j = self.path.find("?", 1)
+        i = self.path.rfind("/")
+        j = self.path.find("?")
 
         if i==-1 and j==-1:
             return self.path

