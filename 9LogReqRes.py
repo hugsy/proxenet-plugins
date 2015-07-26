@@ -22,8 +22,8 @@ class SqliteDb:
 
         print("[%s] HTTP traffic will be stored in '%s'" % (__PLUGIN_NAME__, dbname))
         self.data_file = dbname
-        self.execute("CREATE TABLE requests  (id INTEGER, request BLOB, uri TEXT, timestamp INTEGER)")
-        self.execute("CREATE TABLE responses (id INTEGER, response BLOB,  uri TEXT, timestamp INTEGER)")
+        self.execute("CREATE TABLE requests  (id INTEGER, request BLOB, uri TEXT, timestamp INTEGER, comment TEXT DEFAULT NULL)")
+        self.execute("CREATE TABLE responses (id INTEGER, response BLOB,  uri TEXT, timestamp INTEGER, comment TEXT DEFAULT NULL)")
         return
 
     def connect(self):
@@ -52,14 +52,14 @@ db = SqliteDb()
 def proxenet_request_hook(request_id, request, uri):
     global db
     ts = int( time.time() )
-    db.execute("INSERT INTO requests VALUES (?, ?, ?, ?)", (request_id, request, uri, ts))
+    db.execute("INSERT INTO requests VALUES (?, ?, ?, ?, ?)", (request_id, request, uri, ts, ''))
     return request
 
 
 def proxenet_response_hook(response_id, response, uri):
     global db
     ts = int( time.time() )
-    db.execute("INSERT INTO responses VALUES (?, ?, ?, ?)", (response_id, response, uri, ts))
+    db.execute("INSERT INTO responses VALUES (?, ?, ?, ?, ?)", (response_id, response, uri, ts, ''))
     return response
 
 
