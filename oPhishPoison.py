@@ -57,8 +57,9 @@ def is_supported_type(t):
     Checks if the content type is supported by our poisoining plugins. If not, the request will
     not be tampered.
     """
+    p = t.lower()
     for k,v in types.iteritems():
-        if v.lower() == t.lower():  return k
+        if v == p:  return k
     return None
 
 
