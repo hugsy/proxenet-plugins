@@ -636,11 +636,14 @@ class ReceptorMainWindow(QWidget):
     def __init__(self, parent):
         super(ReceptorMainWindow, self).__init__()
         self.parent = parent
+        self.do_updateClen = True
         self.setMainWindowLayout()
         return
 
     def bounceResponse(self):
-        self.parent.body = str( self.parent.body )
+        self.parent.body = str( self.bodyEditField.toPlainText() )
+        if self.do_updateClen:
+            self.updateContentLengthHeader()
         QApplication.quit()
         return
 
@@ -666,10 +669,14 @@ class ReceptorMainWindow(QWidget):
 
         btnLayout = QHBoxLayout()
         btnLayout.addStretch(1)
+        cb = QCheckBox("Update 'Content-Length' header")
+        cb.stateChanged.connect(self.updateContentLengthState)
+        cb.toggle()
         bounceButton = QPushButton("Bounce")
         bounceButton.clicked.connect( self.bounceResponse )
         cancelButton = QPushButton("Cancel")
         cancelButton.clicked.connect(QApplication.quit)
+        btnLayout.addWidget(cb)
         btnLayout.addWidget(cancelButton)
         btnLayout.addWidget(bounceButton)
 
@@ -677,6 +684,29 @@ class ReceptorMainWindow(QWidget):
         vbox.addLayout(bodyLayout)
         vbox.addLayout(btnLayout)
         self.setLayout(vbox)
+        return
+
+    def updateContentLengthState(self, state):
+        self.do_updateClen = (state == QtCore.Qt.Checked)
+        return
+
+    def updateContentLengthHeader(self):
+        try:
+            headers, body = self.parent.body.split("\n"*2)
+            headers = headers.split("\n")
+            content_length = len(body)
+            done = False
+
+            for i in xrange( len(headers) ):
+                header = str( headers[i] )
+                if header.startswith("Content-Length") and not done:
+                    headers.pop(i)
+                    headers.append("Content-Length: %d" % content_length)
+                    done = True
+
+            self.parent.body = "\n".join( headers ) + "\n"*2 + body
+        except:
+            pass
         return
 
 
@@ -795,7 +825,7 @@ def recept(rid, text, uri):
         return ret
 
     except Exception as e:
-        error("An unexpected exception occured on request %d: %s" % (rid, e))
+        error("An unexpected exception occured on response %d: %s" % (rid, e))
         return text
 
 
@@ -809,11 +839,17 @@ def call_gui(_type, rid, buffer, uri):
 
 
 def proxenet_request_hook(request_id, request, uri):
-    return call_gui("req", request_id, request, uri)
+    if __name__.endswith("InterceptorResponse") or __name__.endswith("Interceptor"):
+        return call_gui("req", request_id, request, uri)
+    else:
+        return request
 
 
 def proxenet_response_hook(response_id, response, uri):
-    return call_gui("res", response_id, response, uri)
+    if __name__.endswith("InterceptorResponse") or __name__.endswith("Interceptor"):
+        return call_gui("res", response_id, response, uri)
+    else:
+        return response
 
 
 if __name__ == "__main__":
