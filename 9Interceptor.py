@@ -39,6 +39,7 @@ CRLF = "\r\n"
 CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
 config = None
 
+WINDOW_SIZE = (960, 600)
 
 def error(msg):
     sys.stderr.write("\x1b[1m" + "\x1b[31m" + msg + "\x1b[0m\n")
@@ -447,10 +448,19 @@ class Interceptor(QMainWindow):
         self.show()
         return
 
+    def center(self):
+        frameGm = self.frameGeometry()
+        screen = QtGui.QApplication.desktop().screenNumber(QtGui.QApplication.desktop().cursor().pos())
+        centerPoint = QtGui.QApplication.desktop().screenGeometry(screen).center()
+        frameGm.moveCenter(centerPoint)
+        self.move(frameGm.topLeft())
+        return
+
     def setMainWindowProperty(self):
-        self.setGeometry(50, 50, 960, 600)
-        self.setFixedSize(960, 600)
+        self.resize(*WINDOW_SIZE)
+        self.setFixedSize(*WINDOW_SIZE)
         self.setWindowTitle(self.title)
+        self.center()
 
         if config.has_option(PLUGIN_NAME, "style"):
             qtlook = config.get(PLUGIN_NAME, "style")
@@ -724,10 +734,19 @@ class Receptor(QMainWindow):
         self.show()
         return
 
+    def center(self):
+        frameGm = self.frameGeometry()
+        screen = QtGui.QApplication.desktop().screenNumber(QtGui.QApplication.desktop().cursor().pos())
+        centerPoint = QtGui.QApplication.desktop().screenGeometry(screen).center()
+        frameGm.moveCenter(centerPoint)
+        self.move(frameGm.topLeft())
+        return
+
     def setMainWindowProperty(self):
-        self.setGeometry(50, 50, 960, 600)
-        self.setFixedSize(960, 600)
+        self.resize(*WINDOW_SIZE)
+        self.setFixedSize(*WINDOW_SIZE)
         self.setWindowTitle(self.title)
+        self.center()
 
         if config.has_option(PLUGIN_NAME, "style"):
             qtlook = config.get(PLUGIN_NAME, "style")

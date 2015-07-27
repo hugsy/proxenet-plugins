@@ -19,10 +19,11 @@ CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
 try:
     config = ConfigParser.ConfigParser()
     config.read(CONFIG_FILE)
-    dbpath = config.get(PLUGIN_NAME, "path_to_logdb", 0, {"home": os.getenv("HOME")})
+    dbpath = os.path.realpath( config.get(PLUGIN_NAME, "path_to_logdb", 0, {"home": os.getenv("HOME")}) )
+    if not os.path.exists(dbpath):
+        raise Exception("falling back to autogen db")
     dbname = dbpath + "/proxenet-"+str( int(time.time()) )+".db"
 except Exception as e:
-    print (e)
     dbname = "/tmp/proxenet-"+str( int(time.time()) )+".db"
 
 
