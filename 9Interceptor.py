@@ -490,9 +490,14 @@ class Interceptor(QMainWindow):
         fuzzReq.setShortcut('Ctrl+T')
         fuzzReq.triggered.connect(self.sendToPatator)
 
+        sqlMapReq = QAction(QIcon(), 'Use \'sqlmap\' on the request', self)
+        sqlMapReq.setShortcut('Ctrl+I')
+        sqlMapReq.triggered.connect(self.sendToSqlMap)
+
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&Actions')
         fileMenu.addAction(fuzzReq)
+        fileMenu.addAction(sqlMapReq)
 
         saveMenu = fileMenu.addMenu('Save As')
         saveMenu.addAction(saveTxtFile)
@@ -501,24 +506,38 @@ class Interceptor(QMainWindow):
         saveMenu.addAction(savePlFile)
         return
 
+    def sendToGeneric(self, cmd, cmd_text, **kwargs):
+        clip = QApplication.clipboard()
+        clip.setText(cmd_text)
+        title = kwargs.get("title", "Send to %s" % cmd)
+        desc = kwargs.get("desc", "'%s' command successfully copied to clipboard!" % cmd)
+        QtGui.QMessageBox.information(self, title, desc, QtGui.QMessageBox.Ok)
+        return
+
+    def sendToSqlMap(self):
+        method = self.headers.split(" ")[0].replace('"', '\\"')
+        headers = self.headers.split("\n")
+        cmd = """sqlmap.py -u "{}" """.format(self.uri)
+        cmd+= """--method="{}" """.format(method.replace('"', '\\"'))
+        for h in headers[1:]: cmd+= """--header="{}" """.format(h.replace('"', '\\"'))
+        if self.body is not None and len(self.body) > 0:
+            cmd+= """--data="{}" """.format(self.body.replace('"', '\\"'))
+        self.sendToGeneric("sqlmap", cmd)
+        return
+
     def sendToPatator(self):
         method = self.headers.split(" ")[0].replace('"', '\\"')
         headers = self.headers.split("\n")
 
-        cmd = "patator http_fuzz url=\"{}\" 0=/path/to/wordlist.txt ".format(self.uri)
-        cmd+= "method=\"{}\" ".format(method.replace('"', '\\"'))
+        cmd = """patator http_fuzz url="{}" 0=/path/to/wordlist.txt """.format(self.uri)
+        cmd+= """method="{}" """.format(method.replace('"', '\\"'))
         for h in headers[1:]:
-            cmd+= "header=\"{}\" ".format(h.replace('"', '\\"'))
+            cmd+= """header="{}" """.format(h.replace('"', '\\"'))
         if self.body is not None and len(self.body) > 0:
-            cmd+= "body=\"{}\" ".format(self.body.replace('"', '\\"'))
+            cmd+= """body="{}" """.format(self.body.replace('"', '\\"'))
         cmd+= "-x ignore:code=404 -x ignore,retry:code=500"
 
-        clip = QApplication.clipboard()
-        clip.setText(cmd)
-        reply = QtGui.QMessageBox.information(self, "Send to patator",
-                                              "Command successfully copied to clipboard!\n"
-                                              "Remember to edit fields to fuzz ;)",
-                                              QtGui.QMessageBox.Ok)
+        self.sendToGeneric("patator", cmd)
         return
 
     def writeGenericFile(self, title, content):
@@ -902,5 +921,5 @@ Content-Length: %d\r
     print ("="*50)
     print ("AFTER intercept:\n%s\n" % intercept(rid, req, uri))
 
-    print ("="*50)
-    print ("AFTER recept:\n%s\n" % recept(rid, req, uri))
+    # print ("="*50)
+    # print ("AFTER recept:\n%s\n" % recept(rid, req, uri))
