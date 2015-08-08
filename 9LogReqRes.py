@@ -17,13 +17,21 @@ HOME = os.getenv( "HOME" )
 CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
 
 try:
-    option_name = "path_to_logdb"
+    option_name = "db_path"
     config = ConfigParser.ConfigParser()
     config.read(CONFIG_FILE)
     dbpath = os.path.realpath( config.get(PLUGIN_NAME, option_name, 0, {"home": os.getenv("HOME")}) )
     if not os.path.exists(dbpath):
-        raise Exception("falling back to autogen db")
-    dbname = dbpath + "/proxenet-"+str( int(time.time()) )+".db"
+        raise Exception("Falling back to autogen db")
+
+    fmt_name = config.get(PLUGIN_NAME, "db_name_fmt")
+    dbname = dbpath + "/" + fmt_name
+    dbname = dbname.format(timestamp=int(time.time()),
+                           progname=PLUGIN_NAME,
+                           pid=os.getpid(),
+                           format="sqlite",
+    )
+
 except Exception as e:
     dbname = "/tmp/proxenet-"+str( int(time.time()) )+".db"
     print("[-] Could not find '%s/%s' option in '%s', using default '%s'" % (PLUGIN_NAME, option_name, CONFIG_FILE, dbname))
@@ -33,8 +41,8 @@ class SqliteDb:
     def __init__(self, dbname):
         print("[%s] HTTP traffic will be stored in '%s'" % (PLUGIN_NAME, dbname))
         self.data_file = dbname
-        self.execute("CREATE TABLE requests  (id INTEGER, request BLOB, uri TEXT, timestamp INTEGER, comment TEXT DEFAULT NULL)")
-        self.execute("CREATE TABLE responses (id INTEGER, response BLOB,  uri TEXT, timestamp INTEGER, comment TEXT DEFAULT NULL)")
+        self.execute("CREATE TABLE IF NOT EXISTS requests  (id INTEGER, request BLOB, uri TEXT, timestamp INTEGER, comment TEXT DEFAULT NULL)")
+        self.execute("CREATE TABLE IF NOT EXISTS responses (id INTEGER, response BLOB,  uri TEXT, timestamp INTEGER, comment TEXT DEFAULT NULL)")
         return
 
     def connect(self):
