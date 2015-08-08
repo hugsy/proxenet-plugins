@@ -521,7 +521,9 @@ class Interceptor(QMainWindow):
         headers = self.headers.split("\n")
         cmd = """sqlmap.py -u "{}" """.format(self.uri)
         cmd+= """--method="{}" """.format(method.replace('"', '\\"'))
-        for h in headers[1:]: cmd+= """--header="{}" """.format(h.replace('"', '\\"'))
+        for h in headers[1:]:
+            if len(h):
+                cmd+= """--header="{}" """.format(h.replace('"', '\\"'))
         if self.body is not None and len(self.body) > 0:
             cmd+= """--data="{}" """.format(self.body.replace('"', '\\"'))
         self.sendToGeneric("sqlmap", cmd)
@@ -534,7 +536,8 @@ class Interceptor(QMainWindow):
         cmd = """patator http_fuzz url="{}" 0=/path/to/wordlist.txt """.format(self.uri)
         cmd+= """method="{}" """.format(method.replace('"', '\\"'))
         for h in headers[1:]:
-            cmd+= """header="{}" """.format(h.replace('"', '\\"'))
+            if len(h):
+                cmd+= """header="{}" """.format(h.replace('"', '\\"'))
         if self.body is not None and len(self.body) > 0:
             cmd+= """body="{}" """.format(self.body.replace('"', '\\"'))
         cmd+= "-x ignore:code=404 -x ignore,retry:code=500"

@@ -63,10 +63,9 @@ db = SqliteDb( dbname=dbname )
 def exist_rid(table, rid, uri):
     global db
     sql_req = "SELECT COUNT(*) FROM %s WHERE id=? AND uri=?" % table
-    for cur in db.execute(sql_req, (rid,uri)):
-        res = cur[0]
-        return res > 0
-    return False
+    cur = db.execute(sql_req, (rid,uri))
+    res = cur.fetchone()[0]
+    return res > 0
 
 
 def insert_log(table, rid, req, uri):
@@ -79,8 +78,8 @@ def insert_log(table, rid, req, uri):
 
 def update_log(table, rid, blob):
     sql_req = "SELECT * FROM %s WHERE id=?" % table
-    cur = db.cursor(sql_req, (rid,))
-    new_blob = cur[1]
+    cur = db.execute(sql_req, (rid,))
+    new_blob = cur.fetchone()[1]
     new_blob+= blob
 
     if table == "requests":  sql_req = "UPDATE requests SET request=? WHERE id=?"
