@@ -17,14 +17,16 @@ HOME = os.getenv( "HOME" )
 CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
 
 try:
+    option_name = "path_to_logdb"
     config = ConfigParser.ConfigParser()
     config.read(CONFIG_FILE)
-    dbpath = os.path.realpath( config.get(PLUGIN_NAME, "path_to_logdb", 0, {"home": os.getenv("HOME")}) )
+    dbpath = os.path.realpath( config.get(PLUGIN_NAME, option_name, 0, {"home": os.getenv("HOME")}) )
     if not os.path.exists(dbpath):
         raise Exception("falling back to autogen db")
     dbname = dbpath + "/proxenet-"+str( int(time.time()) )+".db"
 except Exception as e:
     dbname = "/tmp/proxenet-"+str( int(time.time()) )+".db"
+    print("[-] Could not find '%s/%s' option in '%s', using default '%s'" % (PLUGIN_NAME, option_name, CONFIG_FILE, dbname))
 
 
 class SqliteDb:
@@ -58,18 +60,50 @@ class SqliteDb:
 db = SqliteDb( dbname=dbname )
 
 
-def proxenet_request_hook(request_id, request, uri):
+def exist_rid(table, rid, uri):
+    global db
+    sql_req = "SELECT COUNT(*) FROM %s WHERE id=? AND uri=?" % table
+    for cur in db.execute(sql_req, (rid,uri)):
+        res = cur[0]
+        return res > 0
+    return False
+
+
+def insert_log(table, rid, req, uri):
     global db
     ts = int( time.time() )
-    db.execute("INSERT INTO requests VALUES (?, ?, ?, ?, ?)", (request_id, request, uri, ts, ''))
+    sql_req = "INSERT INTO %s VALUES (?, ?, ?, ?, ?)" % table
+    db.execute(sql_req, (rid, req, uri, ts, ''))
+    return
+
+
+def update_log(table, rid, blob):
+    sql_req = "SELECT * FROM %s WHERE id=?" % table
+    cur = db.cursor(sql_req, (rid,))
+    new_blob = cur[1]
+    new_blob+= blob
+
+    if table == "requests":  sql_req = "UPDATE requests SET request=? WHERE id=?"
+    else:                    sql_req = "UPDATE responses SET response=? WHERE id=?"
+    db.execute(sql_req, (new_blob, rid))
+    return
+
+
+def proxenet_request_hook(request_id, request, uri):
+    table = "requests"
+    if exist_rid(table, request_id, uri):
+        update_log(table, request_id, request)
+    else:
+        insert_log(table, request_id, request, uri)
     return request
 
 
 def proxenet_response_hook(response_id, response, uri):
-    global db
-
-    ts = int( time.time() )
-    db.execute("INSERT INTO responses VALUES (?, ?, ?, ?, ?)", (response_id, response, uri, ts, ''))
+    table = "responses"
+    if exist_rid(table, response_id, uri):
+        update_log(table, response_id, response)
+    else:
+        insert_log(table, response_id, response, uri)
     return response
 
 
@@ -77,7 +111,7 @@ if __name__ == "__main__":
     uri = "foo"
     req = "GET / HTTP/1.1\r\nHost: foo\r\nX-Header: Powered by proxenet\r\n\r\n"
     res = "HTTP/1.0 200 OK\r\n\r\n"
-    rid = 10
+    rid = 42
     proxenet_request_hook(rid, req, uri)
     proxenet_response_hook(rid, res, uri)
     db.disconnect()
