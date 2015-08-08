@@ -41,6 +41,7 @@ config = None
 
 WINDOW_SIZE = (960, 600)
 
+
 def error(msg):
     sys.stderr.write("\x1b[1m" + "\x1b[31m" + msg + "\x1b[0m\n")
     sys.stderr.flush()
@@ -419,6 +420,7 @@ class InterceptorMainWindow(QWidget):
 
 
 class Interceptor(QMainWindow):
+
     def __init__(self, rid, uri, data):
         super(Interceptor, self).__init__()
         self.rid = rid
@@ -441,6 +443,15 @@ class Interceptor(QMainWindow):
             self.headers, self.body = self.data.split("\n\n")
         else:
             self.headers, self.body = self.data, ""
+
+        self.intercept_shortcuts = { "SaveAsText"         : ("Ctrl+S", "Save As Text file", self.writeTxtFile),
+                                     "SaveAsPython"       : ("Ctrl+P", "Save As Python script", self.writePyFile),
+                                     "SaveAsRuby"         : ("Ctrl+R", "Save As Ruby script", self.writeRbFile),
+                                     "SaveAsPerl"         : ("Ctrl+E", "Save As Perl script", self.writePlFile),
+                                     "ActionPatator"      : ("Ctrl+T", "Use 'patator' on the request", self.sendToPatator),
+                                     "ActionSqlMap"       : ("Ctrl+I", "Use 'sqlmap' on the request", self.sendToSqlMap),
+                                     "ActionHelp"         : ("Ctrl+H", "Show help", self.popupHelp),
+        }
 
         self.setMainWindowProperty()
         self.setMainWindowMenuBar()
@@ -470,40 +481,31 @@ class Interceptor(QMainWindow):
         return
 
     def setMainWindowMenuBar(self):
-        saveTxtFile = QAction(QIcon(), 'Save As Text file', self)
-        saveTxtFile.setShortcut('Ctrl+S')
-        saveTxtFile.triggered.connect(self.writeTxtFile)
-
-        savePyFile = QAction(QIcon(), 'Save As Python script', self)
-        savePyFile.setShortcut('Ctrl+P')
-        savePyFile.triggered.connect(self.writePyFile)
-
-        saveRbFile = QAction(QIcon(), 'Save As Ruby script', self)
-        saveRbFile.setShortcut('Ctrl+R')
-        saveRbFile.triggered.connect(self.writeRbFile)
-
-        savePlFile = QAction(QIcon(), 'Save As Perl script', self)
-        savePlFile.setShortcut('Ctrl+E')
-        savePlFile.triggered.connect(self.writePlFile)
-
-        fuzzReq = QAction(QIcon(), 'Use \'patator\' on the request', self)
-        fuzzReq.setShortcut('Ctrl+T')
-        fuzzReq.triggered.connect(self.sendToPatator)
-
-        sqlMapReq = QAction(QIcon(), 'Use \'sqlmap\' on the request', self)
-        sqlMapReq.setShortcut('Ctrl+I')
-        sqlMapReq.triggered.connect(self.sendToSqlMap)
-
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&Actions')
-        fileMenu.addAction(fuzzReq)
-        fileMenu.addAction(sqlMapReq)
+        for i in ["ActionHelp", "ActionSqlMap", "ActionPatator"]:
+            code, desc, meth = self.intercept_shortcuts[i]
+            action = QAction(QIcon(), desc, self)
+            action.setShortcut(code)
+            action.triggered.connect(meth)
+            fileMenu.addAction(action)
 
         saveMenu = fileMenu.addMenu('Save As')
-        saveMenu.addAction(saveTxtFile)
-        saveMenu.addAction(savePyFile)
-        saveMenu.addAction(saveRbFile)
-        saveMenu.addAction(savePlFile)
+        for i in ["SaveAsText", "SaveAsPython", "SaveAsRuby", "SaveAsPerl"]:
+            code, desc, meth = self.intercept_shortcuts[i]
+            action = QAction(QIcon(), desc, self)
+            action.setShortcut(code)
+            action.triggered.connect(meth)
+            saveMenu.addAction(action)
+        return
+
+    def popupHelp(self):
+        title  = "Shortcut definition"
+        desc   = "The following shortcuts are enabled:\n"
+        for key in self.intercept_shortcuts.keys():
+            sc, d = self.intercept_shortcuts[key][0],self.intercept_shortcuts[key][1]
+            desc+= "* {}  {}\n".format(sc, d)
+        QtGui.QMessageBox.information(self, title, desc, QtGui.QMessageBox.Information)
         return
 
     def sendToGeneric(self, cmd, cmd_text, **kwargs):
