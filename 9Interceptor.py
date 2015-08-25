@@ -448,6 +448,7 @@ class Interceptor(QMainWindow):
                                      "SaveAsPython"       : ("Ctrl+P", "Save As Python script", self.writePyFile),
                                      "SaveAsRuby"         : ("Ctrl+R", "Save As Ruby script", self.writeRbFile),
                                      "SaveAsPerl"         : ("Ctrl+E", "Save As Perl script", self.writePlFile),
+                                     "SaveAsCsrfPoc"      : ("Ctrl+O", "Create a CSRF PoC from current request", self.writeCsrfPoc),
                                      "ActionPatator"      : ("Ctrl+T", "Use 'patator' on the request", self.sendToPatator),
                                      "ActionSqlMap"       : ("Ctrl+I", "Use 'sqlmap' on the request", self.sendToSqlMap),
                                      "ActionHelp"         : ("Ctrl+H", "Show help", self.popupHelp),
@@ -491,7 +492,7 @@ class Interceptor(QMainWindow):
             fileMenu.addAction(action)
 
         saveMenu = fileMenu.addMenu('Save As')
-        for i in ["SaveAsText", "SaveAsPython", "SaveAsRuby", "SaveAsPerl"]:
+        for i in ["SaveAsText", "SaveAsPython", "SaveAsRuby", "SaveAsPerl", "SaveAsCsrfPoc"]:
             code, desc, meth = self.intercept_shortcuts[i]
             action = QAction(QIcon(), desc, self)
             action.setShortcut(code)
@@ -543,6 +544,32 @@ class Interceptor(QMainWindow):
         cmd+= "-x ignore:code=404 -x ignore,retry:code=500"
 
         self.sendToGeneric("patator", cmd)
+        return
+
+    def writeCsrfPoc(self):
+        filename = QFileDialog().getSaveFileName(self, "Save CSRF PoC As", os.getenv("HOME"))
+        if len(filename) == 0:
+            return
+
+        body = self.data.split("\n\n")[1]
+        if len(body) == 0:
+            return
+
+        content = "<html><head><title>CSRF PoC</title></head><body>CSRF PoC for {}".format(self.uri)
+        content+= "<form method='POST' action='{}'".format(self.uri)
+        # content+= "enctype='multipart/form-data'" # todo
+        content+= ">"
+        for arg in body.split("&"):
+            k,v = arg.split("=")
+            content+= "<input type='hidden' name='{}' value='{}'>\n".format(k,v)
+
+        content+= "<input type='Submit' value='Start CSRF PoC'>\n"
+        content+= "</form></body></html>"
+
+        with open(filename, "w") as f:
+            f.write(content)
+
+        QtGui.QMessageBox.information(self, "File written", "CSRF PoC written as '{}'".format(filename), QtGui.QMessageBox.Ok)
         return
 
     def writeGenericFile(self, title, content):
