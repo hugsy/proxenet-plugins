@@ -17,6 +17,8 @@ module ShellShock
   $vuln_flag = "Vulnerable: yes"
   $vuln_trigger = '() { :;}; echo -e '
 
+  module_function
+  
   def shellshock_inject(uri, headers, targets)
     vulns = []
 
