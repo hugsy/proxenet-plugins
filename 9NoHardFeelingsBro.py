@@ -5,7 +5,13 @@ AUTHOR = "hugsy"
 PLUGIN_NAME = "NoHardFeelingsBro"
 
 show_banner = True
+banner = """  _                _
+ | |__ _  _ _ _ __| |_
+ | '_ \ || | '_(_-<  _|
+ |_.__/\_,_|_| /__/\__|
 
+By @tweksteen
+"""
 def interact_request(rid, req, uri):
     global show_banner
     if show_banner:
@@ -29,6 +35,9 @@ def interact_request(rid, req, uri):
                 break
             exec(cmd)
         except KeyboardInterrupt:
+            ret = req
+            break
+        except EOFError:
             ret = req
             break
     return ret
