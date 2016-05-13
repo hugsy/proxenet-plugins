@@ -8,7 +8,7 @@ them.
 
 """
 
-import os, sqlite3, time, ConfigParser
+import sys, os, sqlite3, time, ConfigParser
 
 PLUGIN_NAME = "LogReqRes"
 AUTHOR = "hugsy"
@@ -16,26 +16,7 @@ AUTHOR = "hugsy"
 HOME = os.getenv( "HOME" )
 CONFIG_FILE = os.getenv("HOME") + "/.proxenet.ini"
 
-try:
-    option_name = "db_path"
-    config = ConfigParser.ConfigParser()
-    config.read(CONFIG_FILE)
-    dbpath = os.path.realpath( config.get(PLUGIN_NAME, option_name, 0, {"home": os.getenv("HOME")}) )
-    if not os.path.exists(dbpath):
-        raise Exception("Falling back to autogen db")
-
-    fmt_name = config.get(PLUGIN_NAME, "db_name_fmt")
-    dbname = dbpath + "/" + fmt_name
-    dbname = dbname.format(timestamp=int(time.time()),
-                           progname=PLUGIN_NAME,
-                           pid=os.getpid(),
-                           format="sqlite",
-    )
-
-except Exception as e:
-    dbname = "/tmp/proxenet-"+str( int(time.time()) )+".db"
-    print("[-] Could not find '%s/%s' option in '%s', using default '%s'" % (PLUGIN_NAME, option_name, CONFIG_FILE, dbname))
-
+db = None
 
 class SqliteDb:
     def __init__(self, dbname):
@@ -65,11 +46,44 @@ class SqliteDb:
         return cursor
 
 
-db = SqliteDb( dbname=dbname )
+def proxenet_on_load():
+    global db
+
+    try:
+        option_name = "db_path"
+        config = ConfigParser.ConfigParser()
+        config.read(CONFIG_FILE)
+        dbpath = os.path.realpath( config.get(PLUGIN_NAME, option_name, 0, {"home": os.getenv("HOME")}) )
+        if not os.path.exists(dbpath):
+            raise Exception("Falling back to autogen db")
+
+        fmt_name = config.get(PLUGIN_NAME, "db_name_fmt")
+        dbname = dbpath + "/" + fmt_name
+        dbname = dbname.format(timestamp=int(time.time()),
+                               progname=PLUGIN_NAME,
+                               pid=os.getpid(),
+                               format="sqlite",
+        )
+
+    except Exception as e:
+        dbname = "/tmp/proxenet-"+str( int(time.time()) )+".db"
+        print("[-] Could not find '%s/%s' option in '%s', using default '%s'" % (PLUGIN_NAME, option_name, CONFIG_FILE, dbname))
+
+    db = SqliteDb( dbname=dbname )
+
+    return
+
+
+def proxenet_on_leave():
+    global db
+
+    db.disconnect()
+    return
 
 
 def exist_rid(table, rid, uri):
     global db
+
     sql_req = "SELECT COUNT(*) FROM %s WHERE id=? AND uri=?" % table
     cur = db.execute(sql_req, (rid,uri))
     res = cur.fetchone()[0]
@@ -78,6 +92,7 @@ def exist_rid(table, rid, uri):
 
 def insert_log(table, rid, req, uri):
     global db
+
     ts = int( time.time() )
     sql_req = "INSERT INTO %s VALUES (?, ?, ?, ?, ?)" % table
     db.execute(sql_req, (rid, req, uri, ts, ''))
@@ -85,6 +100,8 @@ def insert_log(table, rid, req, uri):
 
 
 def update_log(table, rid, blob):
+    global db
+
     sql_req = "SELECT * FROM %s WHERE id=?" % table
     cur = db.execute(sql_req, (rid,))
     new_blob = cur.fetchone()[1]
@@ -119,7 +136,10 @@ if __name__ == "__main__":
     req = "GET / HTTP/1.1\r\nHost: foo\r\nX-Header: Powered by proxenet\r\n\r\n"
     res = "HTTP/1.0 200 OK\r\n\r\n"
     rid = 42
+
+    proxenet_on_load()
     proxenet_request_hook(rid, req, uri)
     proxenet_response_hook(rid, res, uri)
-    db.disconnect()
-    exit(0)
+    proxenet_on_leave()
+
+    sys.exit(0)

@@ -5,7 +5,7 @@ Note: no deflate/gzip decompression is performed here
 """
 
 __PLUGIN__ = "DumpComments"
-__AUTHOR__ = "@_hugsy"
+__AUTHOR__ = "@_hugsy_"
 
 def proxenet_request_hook(rid, request, uri):
     return request
@@ -23,7 +23,7 @@ def proxenet_response_hook(rid, response, uri):
             off += i + len(comment_start_tag)
             break
 
-        print "Found comment in %d:\n%s" % (rid, response[off+i:off+i+n+3])
+        print "Found comment in %d: %s" % (rid, response[off+i:off+i+n+3])
         off = off+i+n
 
     return response

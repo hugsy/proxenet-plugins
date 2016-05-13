@@ -7,6 +7,14 @@ __PLUGIN_NAME__ = "DumpReqRes"
 __PLUGIN_AUTHOR__ = "@hugsy"
 
 
+def proxenet_on_load():
+    print("Hello from {}".format(__PLUGIN_NAME__))
+    return
+
+def proxenet_on_leave():
+    print("Goodbye from {}".format(__PLUGIN_NAME__))
+    return
+
 def proxenet_request_hook(rid, request, uri):
     c = set([ chr(i) for i in range(0, 20) ]) - set(['\r', '\n'])
     r = set(request)
